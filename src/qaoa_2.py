@@ -1,46 +1,31 @@
-import json
-import networkx as nx
+
 import numpy as np
 import cirq
+from make_graph import make_graph
 
-# Load test dependencies
-with open('test_dependencies.json', 'r') as f:
-    data = json.load(f)
-
-tests = data['tests']
-dependencies = data['dependencies']
-
-"""
-Generate the Graph in Cirq
-Use the test data to create the dependency graph
-"""
-
-# Build the graph
-graph = nx.Graph()
-graph.add_nodes_from(range(len(tests)))  # Add nodes for each test
-graph.add_edges_from([(tests.index(a), tests.index(b)) for a, b in dependencies])
-
-"""
-Adapt QAOA to Real Tests
-Modify the QAOA circuit generation to dynamically map test indices to qubits,
-based on test dataset
-"""
+tests, graph = make_graph()
 
 qubits = [cirq.GridQubit(0, i) for i in range(len(graph.nodes))]
 
 
+# def maxcut_cost(graph, qubits):
+#     circuit = cirq.Circuit()
+#     for edge in graph.edges:
+#         i, j = edge
+#         # Add ZZ interaction to represent edge contribution to the cost
+#         circuit.append(cirq.ZZ(qubits[i - 1], qubits[j - 1]))
+#     return circuit
+
+
 def create_qaoa_circuit(graph, qubits, params):
     circuit = cirq.Circuit()
-
     # Apply initial Hadamard gates
     circuit.append(cirq.H.on_each(qubits))
-
     # Apply cost function
     gamma = params['gamma']
     for edge in graph.edges:
         i, j = edge
         circuit.append(cirq.ZZ(qubits[i], qubits[j]) ** gamma)
-
     # Apply mixing gates
     beta = params['beta']
     circuit.append(cirq.rx(beta).on_each(qubits))
@@ -48,10 +33,20 @@ def create_qaoa_circuit(graph, qubits, params):
     return circuit
 
 
-"""
-Automate Test Selection
-Interpret the quantum output to determine the selected tests
-"""
+# Simulate and evaluate
+simulator = cirq.Simulator()
+
+# Define QAOA parameters
+params = {'gamma': np.pi / 4, 'beta': np.pi / 4}
+qaoa_circuit = create_qaoa_circuit(graph, qubits, params)
+
+print("QAOA Circuit:")
+print(qaoa_circuit)
+
+# Run the simulation
+result = simulator.simulate(qaoa_circuit)
+print("\nFinal State Vector:")
+print(result.final_state_vector)
 
 
 def interpret_results(state_vector, tests):
